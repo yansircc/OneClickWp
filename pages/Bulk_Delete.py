@@ -38,6 +38,6 @@ with st.form(key='del_form'):
             st.toast(f"{i}.local deleted!")
             prgoress_bar.progress((i - start_number + 1) / (end_number - start_number + 1))
     
-        # 4. 重启Nginx服务
+        # 重启Nginx服务
         subprocess.run(["brew", "services", "restart", "nginx"])
         st.success('All done!')
