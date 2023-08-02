@@ -26,6 +26,7 @@ with st.form(key='my_form'):
         prgoress_bar = st.progress(0, 'In progress...')
 
         nginx_notice_string = f'# custom domains from {start_number} to {end_number}\n'
+        localhost_notice_string = f'# custom domains from {start_number} to {end_number}\n'
 
         for i in range(start_number, end_number + 1):
             # 0. 检查用户是否存在
@@ -74,16 +75,18 @@ with st.form(key='my_form'):
                 config = f.read()
             config = config.replace("example.local", server_name)
             config = config.replace("/opt/homebrew/var/www/example", new_dir)
+            config = config.replace("example", str(i))
             with open("/opt/homebrew/etc/nginx/servers/" + server_name + ".conf", "w") as f:
                 f.write(config)
             st.toast(f"{i}.local 创建成功!")
             prgoress_bar.progress((i - start_number + 1) / (end_number - start_number + 1))
             nginx_notice_string += f"address /www.{i}.local/192.168.1.3\n"
+            localhost_notice_string += f"192.168.1.3    www.{i}.local\n"
 
         # print nginx notice info to user
         st.write('将以下添加到软路由的"服务"->"smartDNS"->"Domain Rules"->"域名地址"中末尾')
         st.code(nginx_notice_string)
-
+        # st.code(localhost_notice_string)
         # 4. 重启Nginx服务
         subprocess.run(["brew", "services", "restart", "nginx"])
         st.toast('全部完成!')
