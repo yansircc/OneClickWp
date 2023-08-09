@@ -42,7 +42,10 @@ with st.form(key='my_form'):
             
             # Detect the first-level-folder
             first_level_folder = os.listdir(os.path.join(os.getenv('BASE_DIR'), 'blueprint', 'temp'))[0]
-            base_path = os.path.join(os.getenv('BASE_DIR'), 'blueprint', 'temp', first_level_folder)
+            if first_level_folder == 'app':
+                base_path = os.path.join(os.getenv('BASE_DIR'), 'blueprint', 'temp')
+            else:
+                base_path = os.path.join(os.getenv('BASE_DIR'), 'blueprint', 'temp', first_level_folder)
             
             # Replace the wp-config.php with your template
             shutil.copy(wp_config_template_path, os.path.join(base_path, "app", "public", "wp-config.php"))
