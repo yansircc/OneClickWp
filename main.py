@@ -1,30 +1,66 @@
 import os
 import subprocess
-import zipfile
+from zipfile import ZipFile
 from dotenv import load_dotenv
 import streamlit as st
-# import random
+import shutil
 
 load_dotenv('.env')
 root_password = os.getenv('ROOT_PASSWORD')
 template_database_username = os.getenv('TEMPLATE_DATABASE_USERNAME')
 template_database_password = os.getenv('TEMPLATE_DATABASE_PASSWORD')
 
-template_zip = "/opt/homebrew/var/www/blueprint/blueprint.zip"
-nginx_config_template = "/opt/homebrew/var/www/blueprint/blueprint_nginx.conf"
-blueprint_db_file = "/opt/homebrew/var/www/blueprint/blueprint_db.sql"
+template_zip_default = os.getenv('BASE_DIR') + 'blueprint/blueprint.zip'
+nginx_config_template = os.getenv('BASE_DIR') + 'blueprint/blueprint_nginx.conf'
+blueprint_db_file_default = os.getenv('BASE_DIR') + 'blueprint/blueprint_db.sql'
+wp_config_template_path = os.getenv('BASE_DIR') + 'blueprint/blueprint_wp-config.php'
 
 st.set_page_config(page_title='Bulk Build WordPress', page_icon='🐳', layout='centered')
 st.title('Bulk Build WordPress')
 
 with st.form(key='my_form'):
+    blueprint_zip_uploaded = st.file_uploader('Upload blueprint.zip', type='zip')
     start_number = st.number_input('Start Number', value=36001, step=1)
     end_number = st.number_input('End Number', value=36080, step=1)
     submit_button = st.form_submit_button(label='Ok')
     if submit_button:
         st.toast('表格提交成功!')
-        prgoress_bar = st.progress(0, 'In progress...')
+        progress_bar = st.progress(0, 'In progress...')
+        
+        # Default paths
+        template_zip = template_zip_default
+        blueprint_db_file = blueprint_db_file_default
+        
+        # Check if user uploaded a blueprint.zip file
+        if blueprint_zip_uploaded is not None:
+            blueprint_zip_path = "/tmp/blueprint.zip"
+            with open(blueprint_zip_path, 'wb') as f:
+                f.write(blueprint_zip_uploaded.getbuffer())
+            
+            # Extract the uploaded zip
+            with ZipFile(blueprint_zip_path, 'r') as zip_ref:
+                zip_ref.extractall("/tmp/blueprint")
+            
+            # Detect the first-level-folder
+            first_level_folder = os.listdir("/tmp/blueprint")[0]
+            base_path = os.path.join("/tmp/blueprint", first_level_folder)
+            
+            # Replace the wp-config.php with your template
+            shutil.copy(wp_config_template_path, os.path.join(base_path, "app", "public", "wp-config.php"))
+            
+            # Zip the directory
+            zipped_template_path = os.path.join(base_path, "app", "public_zip.zip")
+            with ZipFile(zipped_template_path, 'w') as zipf:
+                for root, _, files in os.walk(os.path.join(base_path, "app", "public")):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        arcname = os.path.relpath(file_path, os.path.join(base_path, "app", "public"))
+                        zipf.write(file_path, arcname=arcname)
 
+            # Update the paths to use the uploaded files
+            template_zip = zipped_template_path
+            blueprint_db_file = next(os.path.join(base_path, "app", "sql", f) for f in os.listdir(os.path.join(base_path, "app", "sql")) if f.endswith('.sql'))
+        
         nginx_notice_string = f'# custom domains from {start_number} to {end_number}\n'
         localhost_notice_string = f'# custom domains from {start_number} to {end_number}\n'
 
@@ -52,10 +88,10 @@ with st.form(key='my_form'):
                 f"sudo mysql -u {template_database_username} -p{template_database_password} {db_name} < {blueprint_db_file}", shell=True)
 
             # 2. 创建WordPress配置文件
-            new_dir = "/opt/homebrew/var/www/" + str(i)
+            new_dir = os.getenv('BASE_DIR') + str(i)
 
             # 解压WordPress模板文件
-            with zipfile.ZipFile(template_zip, 'r') as zip_ref:
+            with ZipFile(template_zip, 'r') as zip_ref:
                 zip_ref.extractall(new_dir)
 
             with open(new_dir + "/wp-config.php", "r") as f:
@@ -73,13 +109,11 @@ with st.form(key='my_form'):
             server_name = str(i) + ".local"
             with open(nginx_config_template) as f:
                 config = f.read()
-            config = config.replace("example.local", server_name)
-            config = config.replace("/opt/homebrew/var/www/example", new_dir)
             config = config.replace("example", str(i))
-            with open("/opt/homebrew/etc/nginx/servers/" + server_name + ".conf", "w") as f:
+            with open(os.getenv("NGINX_SERVERS_DIR") + server_name + ".conf", "w") as f:
                 f.write(config)
             st.toast(f"{i}.local 创建成功!")
-            prgoress_bar.progress((i - start_number + 1) / (end_number - start_number + 1))
+            progress_bar.progress((i - start_number + 1) / (end_number - start_number + 1))
             nginx_notice_string += f"address /www.{i}.local/192.168.1.3\n"
             localhost_notice_string += f"192.168.1.3    www.{i}.local\n"
 
@@ -89,9 +123,6 @@ with st.form(key='my_form'):
         # st.code(localhost_notice_string)
         # 4. 重启Nginx服务
         subprocess.run(["brew", "services", "restart", "nginx"])
-        st.toast('全部完成!')
-        # random_site_url = str(random.randint(start_number, end_number)) + ".local"
-        # st.success(f"建议访问这个随机域名来做验证: http://www.{random_site_url}")
         st.code('''
                 # 重启软路由DNS服务
                 /etc/init.d/dnsmasq restart
@@ -101,3 +132,5 @@ with st.form(key='my_form'):
                 sudo dscacheutil -flushcache
                 sudo killall -HUP mDNSResponder
                 ''')
+        shutil.rmtree("/tmp/blueprint")
+        st.toast('全部完成!')

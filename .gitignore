@@ -2,3 +2,5 @@
 .vscode/
 testing.py
 __pycache__
+venv
+os.getenv('BASE_DIR')36199/
