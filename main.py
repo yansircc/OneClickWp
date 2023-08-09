@@ -10,10 +10,9 @@ root_password = os.getenv('ROOT_PASSWORD')
 template_database_username = os.getenv('TEMPLATE_DATABASE_USERNAME')
 template_database_password = os.getenv('TEMPLATE_DATABASE_PASSWORD')
 
-template_zip_default = os.getenv('BASE_DIR') + 'blueprint/blueprint.zip'
-nginx_config_template = os.getenv('BASE_DIR') + 'blueprint/blueprint_nginx.conf'
-blueprint_db_file_default = os.getenv('BASE_DIR') + 'blueprint/blueprint_db.sql'
-wp_config_template_path = os.getenv('BASE_DIR') + 'blueprint/blueprint_wp-config.php'
+template_zip_default = os.path.join(os.getenv('BASE_DIR'), 'blueprint', 'blueprint.zip')
+blueprint_db_file_default = os.path.join(os.getenv('BASE_DIR'), 'blueprint', 'blueprint_db.sql')
+wp_config_template_path = os.path.join(os.getenv('BASE_DIR'), 'blueprint', 'blueprint_wp-config.php')
 
 st.set_page_config(page_title='Bulk Build WordPress', page_icon='🐳', layout='centered')
 st.title('Bulk Build WordPress')
@@ -33,17 +32,17 @@ with st.form(key='my_form'):
         
         # Check if user uploaded a blueprint.zip file
         if blueprint_zip_uploaded is not None:
-            blueprint_zip_path = "/tmp/blueprint.zip"
+            blueprint_zip_path = os.path.join(os.getenv('BASE_DIR'), 'blueprint', 'temp.zip')
             with open(blueprint_zip_path, 'wb') as f:
                 f.write(blueprint_zip_uploaded.getbuffer())
             
             # Extract the uploaded zip
             with ZipFile(blueprint_zip_path, 'r') as zip_ref:
-                zip_ref.extractall("/tmp/blueprint")
+                zip_ref.extractall(os.path.join(os.getenv('BASE_DIR'), 'blueprint', 'temp'))
             
             # Detect the first-level-folder
-            first_level_folder = os.listdir("/tmp/blueprint")[0]
-            base_path = os.path.join("/tmp/blueprint", first_level_folder)
+            first_level_folder = os.listdir(os.path.join(os.getenv('BASE_DIR'), 'blueprint', 'temp'))[0]
+            base_path = os.path.join(os.getenv('BASE_DIR'), 'blueprint', 'temp', first_level_folder)
             
             # Replace the wp-config.php with your template
             shutil.copy(wp_config_template_path, os.path.join(base_path, "app", "public", "wp-config.php"))
@@ -60,7 +59,7 @@ with st.form(key='my_form'):
             # Update the paths to use the uploaded files
             template_zip = zipped_template_path
             blueprint_db_file = next(os.path.join(base_path, "app", "sql", f) for f in os.listdir(os.path.join(base_path, "app", "sql")) if f.endswith('.sql'))
-        
+
         nginx_notice_string = f'# custom domains from {start_number} to {end_number}\n'
         localhost_notice_string = f'# custom domains from {start_number} to {end_number}\n'
 
@@ -107,9 +106,25 @@ with st.form(key='my_form'):
 
             # 3. 创建Web服务器配置
             server_name = str(i) + ".local"
-            with open(nginx_config_template) as f:
-                config = f.read()
-            config = config.replace("example", str(i))
+            # Use string as nginx template
+            config = f'''server {{
+                listen 80;
+                server_name {server_name} www.{server_name};
+
+                root {os.getenv('BASE_DIR')}{i};
+                index index.php;
+
+                location / {{
+                    try_files $uri $uri/ /index.php$is_args$args;
+                }}
+
+                location ~ \.php$ {{
+                    fastcgi_pass   127.0.0.1:9000;
+                    fastcgi_index  index.php;
+                    fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                    include        fastcgi_params;
+                }}
+            }}'''
             with open(os.getenv("NGINX_SERVERS_DIR") + server_name + ".conf", "w") as f:
                 f.write(config)
             st.toast(f"{i}.local 创建成功!")
@@ -132,5 +147,5 @@ with st.form(key='my_form'):
                 sudo dscacheutil -flushcache
                 sudo killall -HUP mDNSResponder
                 ''')
-        shutil.rmtree("/tmp/blueprint")
+        shutil.rmtree(os.path.join(os.getenv('BASE_DIR'), 'blueprint', 'temp'))
         st.toast('全部完成!')
