@@ -3,7 +3,7 @@ import subprocess
 import zipfile
 from dotenv import load_dotenv
 import streamlit as st
-import random
+# import random
 
 load_dotenv('.env')
 root_password = os.getenv('ROOT_PASSWORD')
@@ -11,8 +11,8 @@ template_database_username = os.getenv('TEMPLATE_DATABASE_USERNAME')
 template_database_password = os.getenv('TEMPLATE_DATABASE_PASSWORD')
 
 template_zip = "/opt/homebrew/var/www/blueprint/blueprint.zip"
-nginx_config_template = "/opt/homebrew/var/www/blueprint/blueprint_nginx"
-blueprint_db_file = "/opt/homebrew/var/www/blueprint/blueprint_db"
+nginx_config_template = "/opt/homebrew/var/www/blueprint/blueprint_nginx.conf"
+blueprint_db_file = "/opt/homebrew/var/www/blueprint/blueprint_db.sql"
 
 st.set_page_config(page_title='Bulk Build WordPress', page_icon='🐳', layout='centered')
 st.title('Bulk Build WordPress')
@@ -90,8 +90,8 @@ with st.form(key='my_form'):
         # 4. 重启Nginx服务
         subprocess.run(["brew", "services", "restart", "nginx"])
         st.toast('全部完成!')
-        random_site_url = str(random.randint(start_number, end_number)) + ".local"
-        st.success(f"建议访问这个随机域名来做验证: http://www.{random_site_url}")
+        # random_site_url = str(random.randint(start_number, end_number)) + ".local"
+        # st.success(f"建议访问这个随机域名来做验证: http://www.{random_site_url}")
         st.code('''
                 # 重启软路由DNS服务
                 /etc/init.d/dnsmasq restart
