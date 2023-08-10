@@ -46,6 +46,7 @@ with st.form(key='my_form'):
                 base_path = os.path.join(os.getenv('BASE_DIR'), 'blueprint', 'temp')
             elif first_level_folder == '__MACOSX':
                 first_level_folder = os.listdir(os.path.join(os.getenv('BASE_DIR'), 'blueprint', 'temp'))[1]
+                base_path = os.path.join(os.getenv('BASE_DIR'), 'blueprint', 'temp', first_level_folder)
             else:
                 base_path = os.path.join(os.getenv('BASE_DIR'), 'blueprint', 'temp', first_level_folder)
             
